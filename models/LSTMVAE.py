@@ -3,39 +3,48 @@ import torch
 from torch import nn, 
 from torch.nn import functional as F
 
-class LSTMVAE(nn.Module):
-    def __init__(self, latent_dim=64, num_layers=1):
-        super(LSTMVAE, self).__init__()
-        self.fc_hidden_1 = nn.Linear(10000, 2 * latent_dim)
-        self.fc_hidden_2 = nn.Linear(2 * latent_dim, latent_dim)
-        self.fc_encoder = nn.Linear(1, latent_dim)
-        self.rnn_encoder = nn.LSTM(latent_dim, latent_dim, num_layers, batch_first=True, bidirectional=False)
-        self.fc_mu = nn.Linear(2 * latent_dim, 2 * latent_dim)
-        self.fc_logvar = nn.Linear(2 * latent_dim, 2 * latent_dim)
-        self.rnn_decoder = nn.LSTM(latent_dim, latent_dim, num_layers, batch_first=True, bidirectional=False)
-        self.fc_decoder = nn.Linear(latent_dim, 1)
+class AttnGenerator(nn.Module):
+    def __init__(self, input_dim,h_dim, d_model,pred, head,rank, dropout=0.1):
+        super().__init__()
+        self.input_dim = input_dim
+        self.h_dim = h_dim
+        self.pred = pred
+        #################
+        self.dropout = nn.Dropout(dropout)
+        self.ps1 = nn.PixelShuffle(5)
+        self.ps2 = nn.PixelShuffle(5)
+        self.ps3 = nn.PixelShuffle(4)
+        self.ps4 = nn.PixelShuffle(4)
+        self.gan_embedding = PositionalEmbedding(d_model,pred+h_dim)
+        self.block1 = Block_Self(d_model, pred+h_dim,head, rank, dropout)
+        self.block2 = Block_Cross(d_model, h_dim, head, rank, dropout)
+        self.block2 = Block_Self(25*latent_dim, head, rank, dropout)
+        self.block3 = Block_Self(64*latent_dim, head, rank, dropout)
+        self.block4 = Block_Self(256*latent_dim, head, rank, dropout)
+ 
+    def forward(self, x):  #[1, 32, 128]
+        #x = x.permute(1,2,0)
+        bs = x.size(0)
+        ##
+        g_int = torch.zeros([bs, self.pred, self.input_dim]).float().to(device)
+        g_e = self.gan_embedding(g_int)
+        g_cat0 = torch.cat([x,g_e], dim =1)
+        #
+        g = self.block1(g_cat0)
+        #
+        out = self.block2(g, x, x)
+        ##
+       
+        out2 = self.ps2(out1) #[bs, -1, 16, 16*latn]
+        print(out2.shape)
+        out2 = out2.view(-1,25,25*self.latent_dim)
+        out2 = self.block2(out2)
 
-    def reparametize(self, mu, logvar):
-        eps = torch.randn_like(logvar)
-        return mu + eps * torch.exp(0.5 * logvar)
-        
-    def forward(self, x, h):
-        h = self.fc_hidden_1(h)
-        h = self.fc_hidden_2(h)
-        output = self.fc_encoder(x)
-        output, (hidden_state, cell_state) = self.rnn_encoder(output, (h.unsqueeze(0), h.unsqueeze(0)))
-        mean = self.fc_mu(torch.concat((hidden_state, cell_state), dim=1))
-        logvar = self.fc_logvar(torch.concat((hidden_state, cell_state), dim=1))
-        z = self.reparametize(mean, logvar)
-        output, (hidden_state, cell_state) = self.rnn(z.repeat(1, x.shape[1], 1), (z, z))
-        output = self.fc_decoder(output)
-        return (output, mean, logvar, z)
-    
-    def encoder(self, x, h):
-        h = self.fc_hidden_1(h)
-        h = self.fc_hidden_2(h)
-        output = self.fc_encoder(x)
-        output, (hidden_state, cell_state) = self.rnn_encoder(output, (h.unsqueeze(0), h.unsqueeze(0)))
-        mean = self.fc_mu(torch.concat((hidden_state, cell_state), dim=1))
-        logvar = self.fc_logvar(torch.concat((hidden_state, cell_state), dim=1))
-        return (mean, logvar)
+        #
+        out3 = self.ps3(out2)
+        out3 = self.block3(out3)
+        ##
+        out4 = self.ps4(out3)
+        out4 = self.block3(out4)
+
+        return out4[:,-self.pred:,:]
