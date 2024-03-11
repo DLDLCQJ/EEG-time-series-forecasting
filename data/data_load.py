@@ -7,98 +7,105 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, TensorDataset
 
-def split_tr_te(dataset):
-    data_xl =[]
-    data_yl =[]
-    data_gl =[]
-    for data in tqdm(dataset):
-        ##
-        data_xf = data.flatten()#.reshape(-1,1)
-        print(data_xf.shape)
-        ##
-        data_xr_slide, data_yr_slide, data_gr_slide = EEG_sliding_window(data_xf, tw, step)
-
-
-        data_xl.append(data_xr_slide)
-        data_yl.append(data_yr_slide)
-        data_gl.append(data_gr_slide)
-   
-    #return train_xl, train_yl, train_gl, test_xl, test_yl, test_gl
-    return np.squeeze(np.array(data_xl)), np.squeeze(np.array(data_yl)), np.squeeze(np.array(data_gl))
-
-def Loading_data(paths):
-    eeg_list=[]
-    for path in paths:
-        mat_data = sio.loadmat(path)
-        #print(mat_data['EpochData'][0][0][:564,:].shape)
-        eeg_list.append(mat_data['EpochData'][0][0][:564,:])
+class Dataset_EEG_Data():
+    def __init__(self, flag='train', size=None, 
+                 path='/Users/simon/ky/EEG/Data/*.mat',features='S', target='EpochData'):
+      
+        self.seq_len = size[0]
+        self.label_len = size[1] #label_len
+        self.pred_len = size[2]
+        # init
+        assert flag in ['train', 'test', 'val','pred']
+        self.flag = flag
+        
+        self.features = features
+        self.target = target
+        self.path = path
+        
+    def read_data(self):
+        df_list = []
+        paths = glob(self.path)
+        #path = paths[1:2]
+        #(path)
+        for file in paths:
+            mat_data = sio.loadmat(file)
+            df_list.append(mat_data[self.target][0][0][:564, :6800]) 
+        return df_list
     
-    split = int(len(eeg_list)* 0.8)
-    train_x, test_x = eeg_list[: split], eeg_list[split:]
-    return train_x, test_x
+    def split_train_data(self,df_list):
+        for df_raw in df_list:
+            df_raw = np.array(df_raw).reshape(-1, 1)
+            ##
+            df_data = df_raw if self.features == 'S' else df_raw[df_raw.columns[1:]]
+            # 分割数据为训练、测试和验证集
+            total_len = len(df_data)
+            train_end = int((total_len) * 0.5)
 
-def EEG_sliding_window(x, tw, step):
-    x_ = []
-    y_ = []
-    y_gan = []
-    L = len(x)
-    for i in range(tw+step, L, step):
-        tmp_x = x[i-step-tw: i-tw]
-        tmp_y = x[i-tw:i]
-        tmp_y_gan = np.concatenate((tmp_x, tmp_y),axis=0)
-        x_.append(tmp_x)
-        y_.append(tmp_y)
-        y_gan.append(tmp_y_gan)
+            tr_data = df_data[:train_end]
     
-    return x_, y_, y_gan
+            return tr_data
 
+    def split_data(self,df_list):
+        for df_raw in df_list:
+            df_raw = np.array(df_raw).reshape(-1, 1)
+            ##
+            df_data = df_raw if self.features == 'S' else df_raw[df_raw.columns[1:]]
+            # # 分割数据为训练、测试和验证集
+            # total_len = len(df_data)
+            # train_end = int((total_len-self.pred_len-self.seq_len) * 0.5)
+            # val_end = train_end + int((total_len-self.pred_len-self.seq_len) * 0.25)
+            # ##
+            # data = df_data[:train_end]
+            # if self.flag == 'val':
+            #     data = df_data[train_end:val_end]
+            # elif self.flag == 'test':
+            #     data = df_data[val_end:-(self.pred_len+self.seq_len)]
+            # elif self.flag == 'pred':
+            #     data = df_data[-(self.pred_len+self.seq_len):]
+            # 分割数据为训练、测试和验证集
+            total_len = len(df_data)
+            train_end = int((total_len) * 0.5)
+            val_end = train_end + int((total_len) * 0.25)
+            test_end = val_end + int((total_len) * 0.24)
+            if self.flag == 'val':
+                data = df_data[train_end:val_end]
+            elif self.flag == 'test':
+                data = df_data[val_end:test_end]
+            elif self.flag == 'pred':
+                data = df_data[test_end:(test_end+self.pred_len+self.seq_len+1)]
+            return data
+        
+    def slice_data(self, data):
+        x_, y_= [], []
+        L = len(data)
+        for i in range(self.seq_len+self.pred_len, L, self.seq_len):
+            tmp_x = data[i-self.pred_len-self.seq_len: i-self.pred_len]
+            tmp_y = data[i-self.pred_len:i]
+            x_.append(tmp_x)
+            y_.append(tmp_y)
+        
+        return np.array(x_).reshape(-1,self.seq_len), np.array(y_).reshape(-1,self.pred_len)
 
-paths = glob(r'/Users/simon/ky/EEG/Data/*.mat')
-paths = paths[:3]
+    def scaler_data(self):
+        
+        df_list = self.read_data()
+        train_data = self.split_train_data(df_list)
+        seq_train_x, seq_train_y = self.slice_data(train_data)
+        x_scaler = prep.MinMaxScaler(feature_range=(0, 1))
+        y_scaler = prep.MinMaxScaler(feature_range=(0, 1))
+        seq_train_xs = x_scaler.fit_transform(seq_train_x)
+        seq_train_ys = y_scaler.fit_transform(seq_train_y)
+        train_xs = torch.from_numpy(seq_train_xs).unsqueeze(-1).float()
+        train_ys = torch.from_numpy(seq_train_ys).unsqueeze(-1).float()
+        if self.flag != 'train':
+            data = self.split_data(df_list)
+            seq_x,seq_y = self.slice_data(data)
+            seq_xs = x_scaler.transform(seq_x)
+            seq_ys = y_scaler.transform(seq_y)
+            xs = torch.from_numpy(seq_xs).unsqueeze(-1).float()
+            ys = torch.from_numpy(seq_ys).unsqueeze(-1).float()
 
-tw = 6801//3
-step=6801
-train_dataset,test_dataset = Loading_data(paths)
-train_x, train_y, train_g= split_tr_te(train_dataset)
-test_x, test_y, test_g = split_tr_te(test_dataset)
-
-print(f'train_x: {train_x.shape} train_y: {train_y.shape} train_g: {train_g.shape}')
-print(f'test_x: {test_x.shape} test_y: {test_y.shape} test_g: {test_g.shape}')
-
-train_xr = train_x.reshape(-1,6801)
-test_xr = test_x.reshape(-1,6801)
-train_yr = train_y.reshape(-1,2267)
-test_yr = test_y.reshape(-1,2267)
-train_gr = train_g.reshape(-1,9068)
-test_gr = test_g.reshape(-1,9068)
-##
-x_scaler = MinMaxScaler(feature_range = (0, 1))    
-train_xs = x_scaler.fit_transform(train_xr)
-test_xs = x_scaler.transform(test_xr)
-y_scaler =MinMaxScaler(feature_range = (0, 1)) 
-train_ys = y_scaler.fit_transform(train_yr)
-test_ys = y_scaler.transform(test_yr)
-g_scaler =MinMaxScaler(feature_range = (0, 1)) 
-train_gs = g_scaler.fit_transform(train_gr)
-test_gs = g_scaler.transform(test_gr)
-print(train_xs.shape)
-print(train_gs.shape)
-##
-train_xt = torch.from_numpy(train_xs).float()
-train_yt = torch.from_numpy(train_ys).float()
-train_gt = torch.from_numpy(train_gs).float()
-test_xt = torch.from_numpy(test_xs).float()
-test_yt = torch.from_numpy(test_ys).float()
-test_gt = torch.from_numpy(test_gs).float()
-##
-train_x_slide = torch.unsqueeze(train_xt,2)
-test_x_slide = torch.unsqueeze(test_xt,2)
-train_y_slide = torch.unsqueeze(train_yt,2)
-test_y_slide = torch.unsqueeze(test_yt,2)
-train_y_gan = torch.unsqueeze(train_gt,2)
-test_y_gan = torch.unsqueeze(test_gt,2)
-
-n_seq,seq_len,n_features = train_x_slide.shape
-print(f'train_x_slide: {train_x_slide.shape} train_y_slide: {train_y_slide.shape} train_y_gan: {train_y_gan.shape}')
-print(f'test_x_slide: {test_x_slide.shape} test_y_slide: {test_y_slide.shape} test_y_gan: {test_y_gan.shape}')
-
+        if self.flag == 'train':
+            return TensorDataset(train_xs,train_ys)
+        else:
+            return TensorDataset(xs, ys)
