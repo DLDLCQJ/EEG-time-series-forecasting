@@ -30,30 +30,16 @@ class MultiHead_SelfAttention(nn.Module):
         self.linear_query = nn.Linear(attn_dim, attn_dim)
         self.linear_key = nn.Linear(attn_dim, attn_dim)
         self.linear_value = nn.Linear(attn_dim, attn_dim)
-        ####?#####
         self.convs = nn.Conv1d(rank*rank, len_dim,kernel_size=1)
         self.factor = nn.Parameter(torch.Tensor(1,  self.a_h, self.l_r, rank))
         nn.init.xavier_normal_(self.factor)
     def forward(self, x, mask=None):
         bs = x.size(0)
-        '''
-        x:
-        self.linear_query(x):[1,8,a_h,l_r,head*rank]
-
-        factor:[1,8,a_h,head*rank,l_r]
-
-        '''
+        
         query = self.linear_query(x).view(bs, self.a_h, self.head*self.rank ,self.l_r)
         key = torch.matmul(self.linear_key(x).view(bs, self.a_h, self.head*self.rank ,self.l_r),self.factor)
         value = torch.matmul(self.linear_value(x).view(bs, self.a_h, self.head*self.rank ,self.l_r),self.factor)
 
-        ##
-        '''
-        query:[1, 8, a_h,l_r,l_r]
-        scores:[1,8,-1, -1]
-        value:[1, 8, -1,rank]
-        attn:[1,8,-1,rank]
-        '''
         scores = torch.matmul(query.transpose(-2, -1), key) / math.sqrt(self.head*self.rank)
         self_attn = F.softmax(scores, dim=-1)
         self_attn = torch.matmul(self_attn, value.transpose(-2, -1))
