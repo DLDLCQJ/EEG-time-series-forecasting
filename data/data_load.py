@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, TensorDataset
 
-class Dataset_EEG_Data():
+class Dataset_Data():
     def __init__(self, flag='train', size=None, 
-                 path='/Users/simon/ky/EEG/Data/*.mat',features='S', target='EpochData'):
+                 path='/Users/simon/ky/music/Data/*.mat',features='S', target='EpochData'):
       
         self.seq_len = size[0]
         self.label_len = size[1] #label_len
@@ -37,7 +37,6 @@ class Dataset_EEG_Data():
             df_raw = np.array(df_raw).reshape(-1, 1)
             ##
             df_data = df_raw if self.features == 'S' else df_raw[df_raw.columns[1:]]
-            # 分割数据为训练、测试和验证集
             total_len = len(df_data)
             train_end = int((total_len) * 0.5)
 
@@ -50,7 +49,7 @@ class Dataset_EEG_Data():
             df_raw = np.array(df_raw).reshape(-1, 1)
             ##
             df_data = df_raw if self.features == 'S' else df_raw[df_raw.columns[1:]]
-            # # 分割数据为训练、测试和验证集
+           
             # total_len = len(df_data)
             # train_end = int((total_len-self.pred_len-self.seq_len) * 0.5)
             # val_end = train_end + int((total_len-self.pred_len-self.seq_len) * 0.25)
@@ -62,7 +61,7 @@ class Dataset_EEG_Data():
             #     data = df_data[val_end:-(self.pred_len+self.seq_len)]
             # elif self.flag == 'pred':
             #     data = df_data[-(self.pred_len+self.seq_len):]
-            # 分割数据为训练、测试和验证集
+           
             total_len = len(df_data)
             train_end = int((total_len) * 0.5)
             val_end = train_end + int((total_len) * 0.25)
