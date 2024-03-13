@@ -17,13 +17,13 @@ def main():
     parser = argparse.ArgumentParser(description='XXX family for Time Series Forecasting')
     # basic config
     parser.add_argument('--is_training', type=int, default=1, help='status')
-    parser.add_argument('--model_id', type=str,  default='EEGPT_pre1_1', help='model id') ##
-    parser.add_argument('--premodel', type=str, default='EEGPT', help='pretraining model name')
-    parser.add_argument('--model', type=str, default='EEGPT', help='model name, options: [EEGPT, FEDformer, Autoformer, Informer,Reformer, Transformer]')
+    parser.add_argument('--model_id', type=str,  default='MGPT_pre1_1', help='model id') ##
+    parser.add_argument('--premodel', type=str, default='MGPT', help='pretraining model name')
+    parser.add_argument('--model', type=str, default='MGPT', help='model name, options: [MGPT]')
     parser.add_argument('--attn_type', type=str, default='sparse', help='model name, options: [local, full, sparse, lora, DS, auto, flash, flow]')
     # data loader
-    parser.add_argument('--data', type=str,  default='EEG', help='dataset type')
-    parser.add_argument('--root_path', type=str, default='/lustre/project/eegprediction/Data', help='root path of the data file')
+    parser.add_argument('--data', type=str,  default='music', help='dataset type')
+    parser.add_argument('--root_path', type=str, default='/lustre/project/musicprediction/Data', help='root path of the data file')
     parser.add_argument('--data_path', type=str, default='*.mat', help='data file')
     parser.add_argument('--features', type=str, default='S',
                         help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
@@ -41,9 +41,9 @@ def main():
     parser.add_argument('--scale_factor', type=int, default=5, metavar='N', help='number of interplote (default: 10)')
     parser.add_argument('--win', type=int, default=100, metavar='N', help='window of local attention (default: 100)')
     # forecasting task
-    parser.add_argument('--seq_len', type=int, default=6800*10, help='input sequence length')
-    parser.add_argument('--label_len', type=int, default=6800, help='start token length')
-    parser.add_argument('--pred_len', type=int, default=6800*200, help='prediction sequence length')
+    parser.add_argument('--seq_len', type=int, default=1000*10, help='input sequence length')
+    parser.add_argument('--label_len', type=int, default=1000, help='start token length')
+    parser.add_argument('--pred_len', type=int, default=1000*200, help='prediction sequence length')
     # model define 
     parser.add_argument('--bucket_size', type=int, default=4, help='for Reformer')
     parser.add_argument('--n_hashes', type=int, default=4, help='for Reformer')
