@@ -5,11 +5,11 @@ logging.basicConfig(format='%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)
 
 from data.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import EEGPT, Informer, Autoformer, Transformer, Reformer
+from models import MGPT
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
 from torch.utils.data import Dataset, DataLoader
-from data.data_loader import Dataset_EEG_Data,Dataset_EEG_Pred
+from data.data_loader import Dataset_Data,Dataset_Pred
 from layers.Convfamily import FeedForwardAdapter,dec_adas,enc_adas
 from layers.Attenfamily import Attn_Blocks, AttentionLayer, LoRa_Attn
 
@@ -34,11 +34,7 @@ class Exp_Main(Exp_Basic):
 
     def _build_model(self):
         model_dict = {
-            'EEGPT' : EEGPT,
-            'Informer': Informer,
-            'Autoformer': Autoformer,
-            'Transformer': Transformer,
-            'Reformer': Reformer,
+            'MGPT' : MGPT,
         }
         #model = model_dict[self.args.model](self.args).float()
         model = model_dict[self.args.model].Model(self.args).float()
@@ -134,7 +130,7 @@ class Exp_Main(Exp_Basic):
     def _get_data(self, flag,scalers=None):
         args = self.args
         data_dict = {
-            'EEG':Dataset_EEG_Data
+            'music':Dataset_Data
         }
         Data = data_dict[self.args.data]
         data_set = Data(
@@ -152,7 +148,7 @@ class Exp_Main(Exp_Basic):
         
         if flag=='pred':
             shuffle_flag = False; drop_last = False; batch_size = 1
-            Data = Dataset_EEG_Pred
+            Data = Dataset_Pred
         else:
             shuffle_flag = True; drop_last = False; batch_size = args.batch_size
         print(flag,len(data_set))
