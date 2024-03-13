@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from layers.Embed import PositionalEmbedding, DataEmbedding,EEGEmbedding
+from layers.Embed import PositionalEmbedding, DataEmbedding,MusEmbedding
 from models.Encoder import Encoder,ConvLayer
 from models.Generator import decoder
 from layers.Convfamily import UNetBlock, ConvMaxpool, Attn_Gate_Update2,FeedForwardAdapter,Up_Mome,Down_Mome
@@ -15,7 +15,7 @@ class Model(nn.Module):
         super().__init__()
         self.pred_len = configs.pred_len
         self.label_len = configs.label_len
-        self.enc_embedding = EEGEmbedding(configs.enc_in,configs.d_model,configs.seq_len)
+        self.enc_embedding = MusEmbedding(configs.enc_in,configs.d_model,configs.seq_len)
         self.encoder = Encoder(
                     [
                     Attn_Blocks(
@@ -93,7 +93,7 @@ class Model(nn.Module):
                             stride_g = configs.stride_g,scale_factor=configs.scale_factor,d_model=configs.d_model,down=False,gene=True,dropout=configs.dropout
                             ) for l in range(configs.g_layers)],
 
-                            [EEGEmbedding(configs.c_out,configs.d_model,configs.pred_len) for l in range(configs.g_layers)],
+                            [MusEmbedding(configs.c_out,configs.d_model,configs.pred_len) for l in range(configs.g_layers)],
 
                             [Attn_Gate_Update2(
                                 #Attn_Blocks(
