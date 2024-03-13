@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.Disc_Unet import discinimator,UNet_Down_Disc, UNet_Up_Disc
-from layers.Embed import PositionalEmbedding, DataEmbedding,EEGEmbedding
+from layers.Embed import PositionalEmbedding, DataEmbedding,MusEmbedding
 from models.Encoder import Encoder,ConvLayer
 from models.Generator import decoder#, Decoder, DecoderLayer
 from layers.Convfamily import UNetBlock, ConvMaxpool, Attn_Gate_Update1,Attn_Gate_Update2,FeedForwardAdapter,ResBlock_Disc
@@ -23,9 +23,9 @@ class gene(nn.Module):
         #                                    configs.dropout)
         # self.enc_embedding = PositionalEmbedding(configs.d_model, configs.seq_len)
         # self.dec_embedding = PositionalEmbedding(configs.d_model, configs.pred_len+configs.label_len)
-        self.enc_embedding = EEGEmbedding(configs.enc_in,configs.d_model,configs.seq_len)
-        self.stoken_embedding = EEGEmbedding(configs.dec_in, configs.d_model,configs.label_len)
-        #self.dec_embedding = EEGEmbedding(configs.dec_in, configs.d_model,configs.pred_len)
+        self.enc_embedding = MusEmbedding(configs.enc_in,configs.d_model,configs.seq_len)
+        self.stoken_embedding = MusEmbedding(configs.dec_in, configs.d_model,configs.label_len)
+        #self.dec_embedding = MusEmbedding(configs.dec_in, configs.d_model,configs.pred_len)
 
         # Encoder
         self.encoder = Encoder(
@@ -52,7 +52,7 @@ class gene(nn.Module):
 
         ## decoder
         self.decoder = decoder(
-                                [EEGEmbedding(configs.d_model, configs.d_model,configs.label_len*(configs.stride_g**l)) for l in range(configs.g_layers)],
+                                [MusEmbedding(configs.d_model, configs.d_model,configs.label_len*(configs.stride_g**l)) for l in range(configs.g_layers)],
                                 [Attn_Gate_Update1(
                                 Attn_Blocks(
                                 AttentionLayer(
@@ -71,7 +71,7 @@ class gene(nn.Module):
                                            down=False, gene=True,dropout=configs.dropout
                                            ) for l in range(configs.g_layers)],
 
-                                [EEGEmbedding(configs.d_model, configs.d_model,configs.label_len*(configs.stride_g**(l+1))) for l in range(configs.g_layers)],
+                                [MusEmbedding(configs.d_model, configs.d_model,configs.label_len*(configs.stride_g**(l+1))) for l in range(configs.g_layers)],
                                               
                                 [Attn_Gate_Update2(
 
@@ -124,7 +124,7 @@ class disc(nn.Module):
         #                                    configs.dropout)
         # self.enc_embedding = PositionalEmbedding(configs.d_model, configs.seq_len)
         # self.dec_embedding = PositionalEmbedding(configs.d_model, configs.pred_len+configs.label_len)
-        self.Disc_embedding = EEGEmbedding(configs.dec_in, configs.d_model)
+        self.Disc_embedding = MusEmbedding(configs.dec_in, configs.d_model)
         ## Disc
         #down
         Down_Blocks = nn.ModuleList()
@@ -198,7 +198,7 @@ class disc(nn.Module):
 #         super().__init__()
 #         self.label_len = configs.label_len
 #         self.pred_len = configs.pred_len
-#         self.dec_embedding = EEGEmbedding(configs.dec_in,configs.d_model)
+#         self.dec_embedding = Embedding(configs.dec_in,configs.d_model)
 
 #         ## decoder
 #         self.decoder = decoder(
